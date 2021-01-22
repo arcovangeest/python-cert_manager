@@ -295,6 +295,7 @@ class TestCollect(TestCertificates):
 
 class TestEnroll(TestCertificates):
     """Test the enroll method."""
+    # pylint: disable=too-many-instance-attributes
 
     def setUp(self):
         """Initialize the class."""
@@ -307,10 +308,6 @@ class TestEnroll(TestCertificates):
         self.test_url = self.api_url + "/enroll"
         self.test_external_requester = "email@domain.com"
         self.test_cf = [{"name": "testName", "value": "testValue"}]
-        self.test_cf_invalid = ["I'm not a dict, I'm a string!"]
-        self.test_cf_missing_keys = [{"name": "testName", "missingValue": True}]
-        self.test_cf_invalid_name = [{"name": "someOtherName", "value": "testValue"}]
-        self.test_cf_missing_mandatory_field = [{"name": "testName2", "value": "testValue"}]
 
         self.test_csr = TestEnroll.fake_csr()
         self.test_result = {"renewId": "xwL9Mux8-eLNTsweYYv86Z7r", "sslId": 999}
@@ -391,9 +388,8 @@ class TestEnroll(TestCertificates):
             org_id=self.test_org)
 
         # Verify all the query information
-        self.assertEqual(len(responses.calls), 2)
+        self.assertEqual(len(responses.calls), 1)
         self.assertEqual(responses.calls[0].request.url, self.test_types_url)
-        self.assertEqual(responses.calls[1].request.url, self.test_customfields_url)
 
     @responses.activate
     def test_bad_term(self):
@@ -411,9 +407,8 @@ class TestEnroll(TestCertificates):
             org_id=self.test_org)
 
         # Verify all the query information
-        self.assertEqual(len(responses.calls), 2)
+        self.assertEqual(len(responses.calls), 1)
         self.assertEqual(responses.calls[0].request.url, self.test_types_url)
-        self.assertEqual(responses.calls[1].request.url, self.test_customfields_url)
 
     @responses.activate
     def test_mandatory_custom_fields_success(self):
@@ -452,17 +447,46 @@ class TestEnroll(TestCertificates):
     def test_mandatory_custom_fields_missing(self):
         """It should raise an Exception if mandatory custom fields are missing """
         # Setup the mocked responses
+        test_cf_missing_mandatory_field = [{"name": "testName2", "value": "testValue"}]
+
         # We need to mock the /types and /customFields URLs as well
         # since Certificates.types and Certificate.custom_fields are called from enroll
         responses.add(responses.GET, self.test_types_url, json=self.types_data, status=200)
         responses.add(responses.GET, self.test_customfields_url, json=self.cf_data_mandatory, status=200)
-
         responses.add(responses.POST, self.test_url, json=self.test_result, status=200)
 
         # Call the function, expecting an exception
         self.assertRaises(
             Exception, self.certobj.enroll, cert_type_name=self.test_ct_name, csr=self.test_csr, term=self.test_term,
-            org_id=self.test_org, external_requester=self.test_external_requester, custom_fields=self.test_cf_missing_mandatory_field
+            org_id=self.test_org, external_requester=self.test_external_requester,
+            custom_fields=test_cf_missing_mandatory_field
+        )
+
+        # Verify all the query information
+        self.assertEqual(len(responses.calls), 2)
+        self.assertEqual(responses.calls[0].request.url, self.test_types_url)
+        self.assertEqual(responses.calls[1].request.url, self.test_customfields_url)
+
+    @responses.activate
+    def test_custom_fields_duplicate_keys(self):
+        """It should raise an Exception if mandatory custom fields are missing """
+        # Setup the mocked responses
+        test_cf_duplicate_fields = [
+            {"name": "testName", "value": "testValue"},
+            {"name": "testName", "value": "testValue2"}
+        ]
+
+        # We need to mock the /types and /customFields URLs as well
+        # since Certificates.types and Certificate.custom_fields are called from enroll
+        responses.add(responses.GET, self.test_types_url, json=self.types_data, status=200)
+        responses.add(responses.GET, self.test_customfields_url, json=self.cf_data_mandatory, status=200)
+        responses.add(responses.POST, self.test_url, json=self.test_result, status=200)
+
+        # Call the function, expecting an exception
+        self.assertRaises(
+            Exception, self.certobj.enroll, cert_type_name=self.test_ct_name, csr=self.test_csr, term=self.test_term,
+            org_id=self.test_org, external_requester=self.test_external_requester,
+            custom_fields=test_cf_duplicate_fields
         )
 
         # Verify all the query information
@@ -474,6 +498,8 @@ class TestEnroll(TestCertificates):
     def test_custom_fields_invalid(self):
         """It should raise an Exception if elements of the custom_fields list are anything other than dicts """
         # Setup the mocked responses
+        test_cf_invalid = ["I'm not a dict, I'm a string!"]
+
         # We need to mock the /types and /customFields URLs as well
         # since Certificates.types and Certificate.custom_fields are called from enroll
         responses.add(responses.GET, self.test_types_url, json=self.types_data, status=200)
@@ -484,7 +510,7 @@ class TestEnroll(TestCertificates):
         # Call the function, expecting an exception
         self.assertRaises(
             Exception, self.certobj.enroll, cert_type_name=self.test_ct_name, csr=self.test_csr, term=self.test_term,
-            org_id=self.test_org, external_requester=self.test_external_requester, custom_fields=self.test_cf_invalid
+            org_id=self.test_org, external_requester=self.test_external_requester, custom_fields=test_cf_invalid
         )
 
         # Verify all the query information
@@ -496,17 +522,18 @@ class TestEnroll(TestCertificates):
     def test_custom_fields_keys_missing(self):
         """It should raise an Exception if a dict in the custom fields list is missing keys """
         # Setup the mocked responses
+        test_cf_missing_keys = [{"name": "testName", "missingValue": True}]
+
         # We need to mock the /types and /customFields URLs as well
         # since Certificates.types and Certificate.custom_fields are called from enroll
         responses.add(responses.GET, self.test_types_url, json=self.types_data, status=200)
         responses.add(responses.GET, self.test_customfields_url, json=self.cf_data, status=200)
-
         responses.add(responses.POST, self.test_url, json=self.test_result, status=200)
 
         # Call the function, expecting an exception
         self.assertRaises(
             Exception, self.certobj.enroll, cert_type_name=self.test_ct_name, csr=self.test_csr, term=self.test_term,
-            org_id=self.test_org, external_requester=self.test_external_requester, custom_fields=self.test_cf_missing_keys
+            org_id=self.test_org, external_requester=self.test_external_requester, custom_fields=test_cf_missing_keys
         )
 
         # Verify all the query information
@@ -516,19 +543,20 @@ class TestEnroll(TestCertificates):
 
     @responses.activate
     def test_custom_fields_key_invalid(self):
-        """It should raise an Exception if a custom field name isn't in the list of custom fields returned by the endpoint """
+        """It should raise an Exception if a supplied custom field name doesn't exist """
         # Setup the mocked responses
+        test_cf_invalid_name = [{"name": "someOtherName", "value": "testValue"}]
+
         # We need to mock the /types and /customFields URLs as well
         # since Certificates.types and Certificate.custom_fields are called from enroll
         responses.add(responses.GET, self.test_types_url, json=self.types_data, status=200)
         responses.add(responses.GET, self.test_customfields_url, json=self.cf_data, status=200)
-
         responses.add(responses.POST, self.test_url, json=self.test_result, status=200)
 
         # Call the function, expecting an exception
         self.assertRaises(
             Exception, self.certobj.enroll, cert_type_name=self.test_ct_name, csr=self.test_csr, term=self.test_term,
-            org_id=self.test_org, external_requester=self.test_external_requester, custom_fields=self.test_cf_invalid_name
+            org_id=self.test_org, external_requester=self.test_external_requester, custom_fields=test_cf_invalid_name
         )
 
         # Verify all the query information
