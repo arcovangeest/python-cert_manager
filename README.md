@@ -36,6 +36,11 @@ You can use pip to install cert_manager:
 pip install cert_manager
 ```
 
+```sh
+#my test version
+pip install git+'https://github.com/arcovangeest/python-cert_manager.git'
+```
+
 ## Examples
 
 This is a simple example that just shows initializing the `Client` object and using it to query the `Organization` and `SSL` endpoints:
